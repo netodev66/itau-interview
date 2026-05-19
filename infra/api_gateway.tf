@@ -5,10 +5,11 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers = ["Authorization", "Content-Type"]
-    max_age       = 300
+    allow_origins  = ["*"]
+    allow_methods  = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    allow_headers  = ["Authorization", "Content-Type", "x-request-id"]
+    expose_headers = ["x-request-id"]
+    max_age        = 300
   }
 }
 
@@ -43,6 +44,12 @@ resource "aws_apigatewayv2_integration" "nlb_proxy" {
   integration_method = "ANY"
   connection_type    = "VPC_LINK"
   connection_id      = aws_apigatewayv2_vpc_link.main.id
+
+  # Inject API Gateway's own requestId as x-request-id so every backend log
+  # line carries a correlation ID traceable back to the gateway access log.
+  request_parameters = {
+    "overwrite:header.x-request-id" = "$context.requestId"
+  }
 }
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
@@ -77,5 +84,16 @@ resource "aws_apigatewayv2_stage" "default" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId        = "$context.requestId"
+      ip               = "$context.identity.sourceIp"
+      method           = "$context.httpMethod"
+      path             = "$context.path"
+      status           = "$context.status"
+      responseLatency  = "$context.responseLatency"
+      responseLength   = "$context.responseLength"
+      userAgent        = "$context.identity.userAgent"
+      integrationError = "$context.integrationErrorMessage"
+    })
   }
 }
