@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { QueryMessagesDto } from './dto/query-messages.dto';
 import { UpdateMessageStatusDto } from './dto/update-message-status.dto';
@@ -7,15 +7,25 @@ import { MessagesRepository } from './repositories/messages.repository.abstract'
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(private readonly repository: MessagesRepository) {}
 
-  create(dto: CreateMessageDto): Promise<Message> {
-    return this.repository.create(dto.content, dto.sender);
+  async create(dto: CreateMessageDto): Promise<Message> {
+    const message = await this.repository.create(dto.content, dto.sender);
+    this.logger.log(
+      { id: message.id, sender: message.sender },
+      'message created',
+    );
+    return message;
   }
 
   async findById(id: string): Promise<Message> {
     const message = await this.repository.findById(id);
-    if (!message) throw new NotFoundException(`Message "${id}" not found`);
+    if (!message) {
+      this.logger.warn({ id }, 'message not found');
+      throw new NotFoundException(`Message "${id}" not found`);
+    }
     return message;
   }
 
@@ -32,7 +42,11 @@ export class MessagesService {
     dto: UpdateMessageStatusDto,
   ): Promise<Message> {
     const message = await this.repository.updateStatus(id, dto.status);
-    if (!message) throw new NotFoundException(`Message "${id}" not found`);
+    if (!message) {
+      this.logger.warn({ id }, 'message not found for status update');
+      throw new NotFoundException(`Message "${id}" not found`);
+    }
+    this.logger.log({ id, status: dto.status }, 'message status updated');
     return message;
   }
 }
