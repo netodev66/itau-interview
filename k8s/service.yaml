@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: messages-api
+  namespace: app
+spec:
+  # ClusterIP + IP target type on the NLB target group: the NLB registers pod IPs
+  # directly, bypassing kube-proxy — lower latency and required for Fargate
+  type: ClusterIP
+  selector:
+    app: messages-api
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP

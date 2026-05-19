@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: messages-api-config
+  namespace: app
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Non-sensitive runtime config only — credentials and ARNs come from Secrets Manager via ESO

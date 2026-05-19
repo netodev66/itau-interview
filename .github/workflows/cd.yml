@@ -1,0 +1,136 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+      - run: yarn test:cov
+      - run: yarn test:e2e
+
+  # ─── Infra ───────────────────────────────────────────────────────────────────
+  infra:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      ecr_url:      ${{ steps.outputs.outputs.ecr_url }}
+      cluster_name: ${{ steps.outputs.outputs.cluster_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.6"
+          terraform_wrapper: false  # required to capture outputs cleanly
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve
+
+      - name: Capture Terraform outputs
+        id: outputs
+        working-directory: infra
+        run: |
+          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "cluster_name=$(terraform output -raw eks_cluster_name)"  >> $GITHUB_OUTPUT
+
+  # ─── Build ───────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push image
+    runs-on: ubuntu-latest
+    needs: infra
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        run: |
+          docker build \
+            --tag ${{ needs.infra.outputs.ecr_url }}:${{ env.IMAGE_TAG }} \
+            --tag ${{ needs.infra.outputs.ecr_url }}:latest \
+            .
+          docker push ${{ needs.infra.outputs.ecr_url }}:${{ env.IMAGE_TAG }}
+          docker push ${{ needs.infra.outputs.ecr_url }}:latest
+
+  # ─── Deploy ──────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: [infra, build]
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ needs.infra.outputs.cluster_name }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Substitute image in deployment manifest
+        env:
+          ECR_REPO_URL: ${{ needs.infra.outputs.ecr_url }}
+        run: envsubst < k8s/deployment.yaml > k8s/deployment.rendered.yaml
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/serviceaccount.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/deployment.rendered.yaml
+          kubectl apply -f k8s/hpa.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/messages-api \
+            --namespace app \
+            --timeout 300s
