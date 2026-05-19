@@ -2,6 +2,12 @@
 
 RESTful messaging API built with NestJS, backed by DynamoDB (single-table design) and authenticated via AWS Cognito. Designed to run on AWS EKS/Fargate.
 
+## Architecture
+
+- [Diagram (draw.io)](docs/architecture.drawio) — open with [draw.io](https://app.diagrams.net/) or the VS Code extension
+- [Architecture overview](docs/architecture.md)
+- [DynamoDB modeling](docs/dynamo-modeling.md)
+
 ## Prerequisites
 
 | Tool | Version |
