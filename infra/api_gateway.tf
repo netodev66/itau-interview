@@ -47,10 +47,10 @@ resource "aws_apigatewayv2_integration" "nlb_proxy" {
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
-# Public — no auth required; clients call this to obtain Cognito tokens
+# Public — no auth required; clients call this to obtain Cognito tokens.
 resource "aws_apigatewayv2_route" "auth" {
   api_id    = aws_apigatewayv2_api.main.id
-  route_key = "ANY /api/v1/auth"
+  route_key = "ANY /api/v1/auth/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.nlb_proxy.id}"
 }
 
