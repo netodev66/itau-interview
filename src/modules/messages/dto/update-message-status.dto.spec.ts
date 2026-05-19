@@ -7,10 +7,13 @@ import { MessageStatus } from '../entities/message.entity';
 const build = (plain: object) => plainToInstance(UpdateMessageStatusDto, plain);
 
 describe('UpdateMessageStatusDto', () => {
-  it.each(Object.values(MessageStatus))('passes with valid status "%s"', async (status) => {
-    const errors = await validate(build({ status }));
-    expect(errors).toHaveLength(0);
-  });
+  it.each(Object.values(MessageStatus))(
+    'passes with valid status "%s"',
+    async (status) => {
+      const errors = await validate(build({ status }));
+      expect(errors).toHaveLength(0);
+    },
+  );
 
   it('fails when status is an unknown value', async () => {
     const errors = await validate(build({ status: 'deleted' }));

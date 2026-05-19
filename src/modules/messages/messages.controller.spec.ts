@@ -3,10 +3,12 @@ import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { MessageStatus } from './entities/message.entity';
 
+const SENDER_UUID = '550e8400-e29b-41d4-a716-446655440000';
+
 const mockMessage = {
   id: 'uuid-1',
   content: 'Hello',
-  sender: 'alice',
+  sender: SENDER_UUID,
   sentAt: new Date('2026-01-01T10:00:00Z'),
   status: MessageStatus.SENT,
 };
@@ -34,7 +36,7 @@ describe('MessagesController', () => {
   });
 
   it('create() calls service.create and returns the message', async () => {
-    const dto = { content: 'Hello', sender: 'alice' };
+    const dto = { content: 'Hello', sender: SENDER_UUID };
     (mockService.create as jest.Mock).mockResolvedValue(mockMessage);
 
     await expect(controller.create(dto)).resolves.toEqual(mockMessage);
@@ -50,7 +52,7 @@ describe('MessagesController', () => {
 
   it('findMany() passes query params to service.findMany', async () => {
     (mockService.findMany as jest.Mock).mockResolvedValue([mockMessage]);
-    const query = { sender: 'alice' };
+    const query = { sender: SENDER_UUID };
 
     await expect(controller.findMany(query)).resolves.toEqual([mockMessage]);
     expect(mockService.findMany).toHaveBeenCalledWith(query);

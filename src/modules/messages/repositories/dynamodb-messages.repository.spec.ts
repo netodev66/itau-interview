@@ -2,6 +2,8 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBMessagesRepository } from './dynamodb-messages.repository';
 import { MessageStatus } from '../entities/message.entity';
 
+const ALICE = '550e8400-e29b-41d4-a716-446655440000';
+
 const mockClient = { send: jest.fn() } as unknown as DynamoDBDocumentClient;
 
 const rawItem = (overrides: object = {}) => ({
@@ -9,7 +11,7 @@ const rawItem = (overrides: object = {}) => ({
   SK: 'MSG#abc',
   id: 'abc',
   content: 'Hello',
-  sender: 'alice',
+  sender: ALICE,
   sentAt: '2025-02-10T14:00:00.000Z',
   status: MessageStatus.SENT,
   ...overrides,
@@ -29,10 +31,10 @@ describe('DynamoDBMessagesRepository', () => {
         .spyOn(repository as any, 'putItem')
         .mockResolvedValue(undefined);
 
-      const result = await repository.create('Hello', 'alice');
+      const result = await repository.create('Hello', ALICE);
 
       expect(result.content).toBe('Hello');
-      expect(result.sender).toBe('alice');
+      expect(result.sender).toBe(ALICE);
       expect(result.status).toBe(MessageStatus.SENT);
       expect(result.sentAt).toBeInstanceOf(Date);
 
@@ -41,7 +43,7 @@ describe('DynamoDBMessagesRepository', () => {
       expect(item.SK).toBe(`MSG#${result.id}`);
       expect(item.GSI_DATE_PK).toMatch(/^MESSAGES#\d{4}-\d{2}-\d{2}$/);
       expect(item.GSI_DATE_SK).toMatch(/^\d{4}-\d{2}-\d{2}T.*#.+$/);
-      expect(item.GSI_SENDER_PK).toBe('SENDER#alice');
+      expect(item.GSI_SENDER_PK).toBe(`SENDER#${ALICE}`);
       expect(item.GSI_SENDER_SK).toMatch(/^\d{4}-\d{2}-\d{2}T.*#.+$/);
     });
   });
@@ -80,16 +82,16 @@ describe('DynamoDBMessagesRepository', () => {
         .spyOn(repository as any, 'queryItems')
         .mockResolvedValue([rawItem()]);
 
-      const result = await repository.findBySender('alice');
+      const result = await repository.findBySender(ALICE);
 
       expect(queryItems).toHaveBeenCalledWith(
         expect.objectContaining({
           indexName: 'GSI_SENDER',
-          expressionValues: { ':pk': 'SENDER#alice' },
+          expressionValues: { ':pk': `SENDER#${ALICE}` },
         }),
       );
       expect(result).toHaveLength(1);
-      expect(result[0].sender).toBe('alice');
+      expect(result[0].sender).toBe(ALICE);
     });
   });
 
@@ -108,7 +110,9 @@ describe('DynamoDBMessagesRepository', () => {
       expect(queryItems).toHaveBeenCalledWith(
         expect.objectContaining({
           indexName: 'GSI_DATE',
-          expressionValues: expect.objectContaining({ ':pk': 'MESSAGES#2025-02-10' }),
+          expressionValues: expect.objectContaining({
+            ':pk': 'MESSAGES#2025-02-10',
+          }),
         }),
       );
     });
@@ -125,13 +129,25 @@ describe('DynamoDBMessagesRepository', () => {
 
       expect(queryItems).toHaveBeenCalledTimes(3);
       expect(queryItems).toHaveBeenCalledWith(
-        expect.objectContaining({ expressionValues: expect.objectContaining({ ':pk': 'MESSAGES#2025-02-10' }) }),
+        expect.objectContaining({
+          expressionValues: expect.objectContaining({
+            ':pk': 'MESSAGES#2025-02-10',
+          }),
+        }),
       );
       expect(queryItems).toHaveBeenCalledWith(
-        expect.objectContaining({ expressionValues: expect.objectContaining({ ':pk': 'MESSAGES#2025-02-11' }) }),
+        expect.objectContaining({
+          expressionValues: expect.objectContaining({
+            ':pk': 'MESSAGES#2025-02-11',
+          }),
+        }),
       );
       expect(queryItems).toHaveBeenCalledWith(
-        expect.objectContaining({ expressionValues: expect.objectContaining({ ':pk': 'MESSAGES#2025-02-12' }) }),
+        expect.objectContaining({
+          expressionValues: expect.objectContaining({
+            ':pk': 'MESSAGES#2025-02-12',
+          }),
+        }),
       );
     });
 
@@ -181,7 +197,9 @@ describe('DynamoDBMessagesRepository', () => {
     it('returns undefined when item does not exist', async () => {
       jest.spyOn(repository as any, 'updateItem').mockResolvedValue(undefined);
 
-      expect(await repository.updateStatus('ghost', MessageStatus.READ)).toBeUndefined();
+      expect(
+        await repository.updateStatus('ghost', MessageStatus.READ),
+      ).toBeUndefined();
     });
   });
 });

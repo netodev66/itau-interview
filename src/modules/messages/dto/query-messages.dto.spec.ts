@@ -3,10 +3,11 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { QueryMessagesDto } from './query-messages.dto';
 
-const build = (plain: object) => plainToInstance(QueryMessagesDto, plain);
-
+const SENDER_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const START = '2025-02-10T00:00:00.000Z';
 const END = '2025-02-10T23:59:59.000Z';
+
+const build = (plain: object) => plainToInstance(QueryMessagesDto, plain);
 
 describe('QueryMessagesDto', () => {
   describe('no filters', () => {
@@ -19,14 +20,19 @@ describe('QueryMessagesDto', () => {
   });
 
   describe('sender filter', () => {
-    it('passes with only sender', async () => {
-      const errors = await validate(build({ sender: 'user-xyz' }));
+    it('passes with a valid sender UUID', async () => {
+      const errors = await validate(build({ sender: SENDER_UUID }));
       expect(errors).toHaveLength(0);
     });
 
     it('passes with sender even when dates are absent', async () => {
-      const errors = await validate(build({ sender: 'user-xyz' }));
+      const errors = await validate(build({ sender: SENDER_UUID }));
       expect(errors).toHaveLength(0);
+    });
+
+    it('fails when sender is not a valid UUID', async () => {
+      const errors = await validate(build({ sender: 'not-a-uuid' }));
+      expect(errors.some((e) => e.property === 'sender')).toBe(true);
     });
 
     it('fails when sender is not a string', async () => {
@@ -65,13 +71,13 @@ describe('QueryMessagesDto', () => {
   });
 
   describe('sender takes priority over dates', () => {
-    it('passes when sender is present even with missing dates', async () => {
-      const errors = await validate(build({ sender: 'alice' }));
+    it('passes when sender UUID is present even with missing dates', async () => {
+      const errors = await validate(build({ sender: SENDER_UUID }));
       expect(errors).toHaveLength(0);
     });
 
     it('passes when all three params are provided', async () => {
-      const errors = await validate(build({ sender: 'alice', startDate: START, endDate: END }));
+      const errors = await validate(build({ sender: SENDER_UUID, startDate: START, endDate: END }));
       expect(errors).toHaveLength(0);
     });
   });

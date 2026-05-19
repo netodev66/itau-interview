@@ -9,6 +9,11 @@ import { MessagesRepository } from '../src/modules/messages/repositories/message
 
 const BASE = '/api/v1/messages';
 
+const ALICE = '550e8400-e29b-41d4-a716-446655440000';
+const BOB   = '550e8400-e29b-41d4-a716-446655440001';
+const CAROL = '550e8400-e29b-41d4-a716-446655440002';
+const NO_MESSAGES_SENDER = '550e8400-e29b-41d4-a716-446655440099';
+
 describe('Messages API (e2e)', () => {
   let app: INestApplication;
 
@@ -41,7 +46,7 @@ describe('Messages API (e2e)', () => {
 
   // ─────────────────────────────────────────────────────────── helpers ──────
 
-  const createMessage = (body = { content: 'Hello', sender: 'alice' }) =>
+  const createMessage = (body = { content: 'Hello', sender: ALICE }) =>
     request(app.getHttpServer()).post(BASE).send(body);
 
   // ────────────────────────────────────────────────── POST /messages ────────
@@ -52,7 +57,7 @@ describe('Messages API (e2e)', () => {
 
       expect(body.id).toBeDefined();
       expect(body.content).toBe('Hello');
-      expect(body.sender).toBe('alice');
+      expect(body.sender).toBe(ALICE);
       expect(body.status).toBe('sent');
       expect(new Date(body.sentAt).toString()).not.toBe('Invalid Date');
     });
@@ -63,7 +68,7 @@ describe('Messages API (e2e)', () => {
     });
 
     it('400 — missing content', async () => {
-      await createMessage({ content: '', sender: 'alice' }).expect(400);
+      await createMessage({ content: '', sender: ALICE }).expect(400);
     });
 
     it('400 — missing sender', async () => {
@@ -73,7 +78,7 @@ describe('Messages API (e2e)', () => {
     it('400 — non-string content', async () => {
       await request(app.getHttpServer())
         .post(BASE)
-        .send({ content: 123, sender: 'alice' })
+        .send({ content: 123, sender: ALICE })
         .expect(400);
     });
   });
@@ -90,7 +95,7 @@ describe('Messages API (e2e)', () => {
 
       expect(body.id).toBe(created.id);
       expect(body.content).toBe('Hello');
-      expect(body.sender).toBe('alice');
+      expect(body.sender).toBe(ALICE);
     });
 
     it('404 — message not found', async () => {
@@ -104,23 +109,23 @@ describe('Messages API (e2e)', () => {
 
   describe('GET /messages?sender=...', () => {
     it('200 — returns messages filtered by sender', async () => {
-      await createMessage({ content: 'A', sender: 'alice' });
-      await createMessage({ content: 'B', sender: 'bob' });
-      await createMessage({ content: 'C', sender: 'alice' });
+      await createMessage({ content: 'A', sender: ALICE });
+      await createMessage({ content: 'B', sender: BOB });
+      await createMessage({ content: 'C', sender: ALICE });
 
       const { body } = await request(app.getHttpServer())
-        .get(`${BASE}?sender=alice`)
+        .get(`${BASE}?sender=${ALICE}`)
         .expect(200);
 
       expect(body).toHaveLength(2);
-      expect(body.every((m: { sender: string }) => m.sender === 'alice')).toBe(
+      expect(body.every((m: { sender: string }) => m.sender === ALICE)).toBe(
         true,
       );
     });
 
     it('200 — returns empty array when sender has no messages', async () => {
       const { body } = await request(app.getHttpServer())
-        .get(`${BASE}?sender=unknown`)
+        .get(`${BASE}?sender=${NO_MESSAGES_SENDER}`)
         .expect(200);
 
       expect(body).toEqual([]);
@@ -188,7 +193,7 @@ describe('Messages API (e2e)', () => {
 
   describe('GET /messages?startDate=...&endDate=...', () => {
     it('200 — returns messages within the date range', async () => {
-      await createMessage({ content: 'In range', sender: 'carol' });
+      await createMessage({ content: 'In range', sender: CAROL });
 
       const start = new Date(Date.now() - 5000).toISOString();
       const end = new Date(Date.now() + 5000).toISOString();
@@ -198,7 +203,7 @@ describe('Messages API (e2e)', () => {
         .expect(200);
 
       expect(body.length).toBeGreaterThanOrEqual(1);
-      expect(body.some((m: { sender: string }) => m.sender === 'carol')).toBe(
+      expect(body.some((m: { sender: string }) => m.sender === CAROL)).toBe(
         true,
       );
     });
