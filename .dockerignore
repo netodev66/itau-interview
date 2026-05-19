@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+coverage-e2e
+.git
+.gitignore
+.env*
+test
+docs
+scripts
+*.md
+jest.all.config.js
