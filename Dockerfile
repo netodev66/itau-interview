@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM gcr.io/distroless/nodejs22-debian12 AS builder
 
 WORKDIR /app
 COPY package.json yarn.lock ./
@@ -8,7 +8,7 @@ COPY src ./src
 RUN yarn build
 RUN yarn install --frozen-lockfile --production && yarn cache clean
 
-FROM node:22-alpine AS production
+FROM gcr.io/distroless/nodejs22-debian12 AS production
 
 ENV NODE_ENV=production
 
